@@ -24,13 +24,8 @@ struct Args {
     dimension: u32,
     #[arg(short, long, help = "Display total time and time per trial")]
     time: bool,
-    #[arg(
-        short,
-        long,
-        default_value_t = true,
-        help = "Run each trial in parrallel (default true)"
-    )]
-    parallel: bool,
+    #[arg(short, long, help = "Run each trial in series (for debugging)")]
+    no_parallel: bool,
 }
 
 fn run_trial_zero_dim(num_points: u32) -> f64 {
@@ -56,14 +51,14 @@ fn main() -> Result<()> {
     }
 
     let start = Instant::now();
-    let average = if args.parallel {
+    let average = if args.no_parallel {
         (0..args.num_trials)
-            .into_par_iter()
+            .into_iter()
             .map(|_| run_trial(args.num_points, args.dimension))
             .sum::<f64>()
     } else {
         (0..args.num_trials)
-            .into_iter()
+            .into_par_iter()
             .map(|_| run_trial(args.num_points, args.dimension))
             .sum::<f64>()
     } / args.num_trials as f64;

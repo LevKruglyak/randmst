@@ -1,7 +1,9 @@
+use std::time::Instant;
+
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use graph::FastZeroDimEdgeGenerator;
-use kruskal::rem_union_find::RemUnionFind;
+use kruskal::{rem_union_find::RemUnionFind, sized_rem_union_find::SizedRemUnionFind};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub mod graph;
@@ -32,13 +34,17 @@ struct Args {
 }
 
 fn run_trial_zero_dim(num_points: u32) -> f64 {
+    kruskal::mst_total_length_fat_component::<SizedRemUnionFind>(num_points)
+}
+
+fn run_trial_zero_dim_2(num_points: u32) -> f64 {
     kruskal::mst_total_length::<RemUnionFind>(FastZeroDimEdgeGenerator::new(num_points))
 }
 
 fn run_trial(num_points: u32, dimension: u32) -> f64 {
-    let start = Instant::now();
     match dimension {
         0 => run_trial_zero_dim(num_points),
+        2 => run_trial_zero_dim_2(num_points),
         _ => 0.0,
     }
 }
@@ -49,6 +55,7 @@ fn main() -> Result<()> {
         return Err(anyhow!("dimension 1 is not supported!"));
     }
 
+    let start = Instant::now();
     let average = if args.parallel {
         (0..args.num_trials)
             .into_par_iter()
@@ -60,6 +67,7 @@ fn main() -> Result<()> {
             .map(|_| run_trial(args.num_points, args.dimension))
             .sum::<f64>()
     } / args.num_trials as f64;
+    println!("elapsed {:?}", start.elapsed());
 
     println!(
         "{:.4} {} {} {}",

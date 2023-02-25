@@ -15,8 +15,9 @@ pub trait KruskalUnionFind {
 pub trait SizedKruskalUnionFind {
     fn new(size: u32) -> Self;
     fn unite(&mut self, u: u32, v: u32) -> Option<(u32, u32)>;
-    fn find(&self, u: u32) -> u32;
-    fn size(&self, u: u32) -> u32;
+    fn same_set(&mut self, u: u32, v: u32) -> bool;
+    fn find(&mut self, u: u32) -> u32;
+    fn size(&mut self, u: u32) -> u32;
 }
 
 // Some generator of sorted edges for use in Kruskal's algorithm
@@ -80,8 +81,7 @@ impl<U: SizedKruskalUnionFind> FatComponentGenerator<U> {
         loop {
             let u = self.rng.gen_range(0..self.size);
             let v = self.rng.gen_range(0..self.size);
-            if let Some((s1, s2)) = self.union_find.unite(u, v) {
-                self.total_internal += s1 as usize * s2 as usize;
+            if !self.union_find.same_set(u, v) {
                 return VertPair(u, v);
             }
         }
@@ -125,8 +125,7 @@ impl<U: SizedKruskalUnionFind> FatComponentGenerator<U> {
             loop {
                 let u = self.sample_remainder_vertex(fat_component);
                 let v = self.sample_remainder_vertex(fat_component);
-                if let Some((s1, s2)) = self.union_find.unite(u, v) {
-                    self.total_internal += s1 as usize * s2 as usize;
+                if !self.union_find.same_set(u, v) {
                     return VertPair(u, v);
                 }
             }
@@ -150,6 +149,9 @@ impl<U: SizedKruskalUnionFind> FatComponentGenerator<U> {
     }
 
     fn check_and_update_remainders(&mut self) {
+        // Make sure fat component hasn't moved
+        self.fat_component = self.fat_component.map(|f| self.union_find.find(f));
+
         match self.fat_component {
             Some(fat_component) => {
                 if (self.size - self.union_find.size(fat_component)) * 2
@@ -179,8 +181,8 @@ impl<U: SizedKruskalUnionFind> Iterator for FatComponentGenerator<U> {
             return None;
         }
 
-        let r: f64 = self.rng.gen();
-        self.inv_min *= r.powf(1.0_f64 / active_edges as f64);
+        // let r: f64 = self.rng.gen();
+        // self.inv_min *= r.powf(1.0_f64 / active_edges as f64);
         self.weight += self.rng.sample::<f64, _>(Exp1) / active_edges as f64;
         self.check_and_update_remainders();
 
@@ -193,7 +195,12 @@ impl<U: SizedKruskalUnionFind> Iterator for FatComponentGenerator<U> {
             None => self.sample_sparse(),
         };
 
-        Some(1.0 - self.inv_min)
+        if let Some((s1, s2)) = self.union_find.unite(edge.0, edge.1) {
+            self.total_internal += s1 as usize * s2 as usize;
+        }
+
+        Some(self.weight)
+        // Some(1.0 - self.inv_min)
     }
 }
 

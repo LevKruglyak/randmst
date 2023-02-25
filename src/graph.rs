@@ -1,7 +1,7 @@
-use rand::{rngs::ThreadRng, thread_rng};
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 use rand_distr::{Distribution, Exp, Uniform};
 
-use crate::kruskal::KruskalEdgeGenerator;
+use crate::kruskal::{rem_union_find::RemUnionFind, KruskalEdgeGenerator, KruskalUnionFind};
 
 pub struct Edge {
     pub u: u32,

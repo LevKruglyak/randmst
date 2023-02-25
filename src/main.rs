@@ -4,8 +4,11 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use graph::FastZeroDimEdgeGenerator;
 use kruskal::{rem_union_find::RemUnionFind, sized_rem_union_find::SizedRemUnionFind};
+use rand::{rngs::ThreadRng, thread_rng};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
+pub mod bitvector;
+pub mod fat_component;
 pub mod graph;
 pub mod kruskal;
 
@@ -30,6 +33,7 @@ struct Args {
 
 fn run_trial_zero_dim(num_points: u32) -> f64 {
     kruskal::mst_total_length_fat_component::<SizedRemUnionFind>(num_points)
+    // fat_component::mst(num_points, thread_rng())
 }
 
 fn run_trial_zero_dim_2(num_points: u32) -> f64 {

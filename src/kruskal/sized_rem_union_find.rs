@@ -42,15 +42,24 @@ impl SizedKruskalUnionFind for SizedRemUnionFind {
         None
     }
 
-    fn find(&self, mut u: u32) -> u32 {
+    fn same_set(&mut self, u: u32, v: u32) -> bool {
+        self.find(u) == self.find(v)
+    }
+
+    fn find(&mut self, mut u: u32) -> u32 {
+        // Path splitting
+        let u_orig = u;
+
         while u != self[u] {
             u = self[u];
         }
 
+        self[u_orig] = u;
+
         u
     }
 
-    fn size(&self, u: u32) -> u32 {
+    fn size(&mut self, u: u32) -> u32 {
         let root = self.find(u);
         self.sizes[root as usize]
     }

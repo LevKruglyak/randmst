@@ -6,8 +6,7 @@ use anyhow::{anyhow, Result};
 use average::MeanWithError;
 use clap::Parser;
 use colored::Colorize;
-use rand::{thread_rng, Rng, RngCore};
-use rand_distr::Uniform;
+use rand::{thread_rng, RngCore};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub mod zero_dim;

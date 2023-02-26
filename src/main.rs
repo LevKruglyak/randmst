@@ -57,6 +57,7 @@ fn main() -> Result<()> {
         return Err(anyhow!("dimension 1 is not supported!"));
     }
 
+    // Run the trials
     let timed_trials: Vec<(f64, Duration)> = if args.no_parallel {
         (0..args.num_trials)
             .into_iter()
@@ -84,24 +85,21 @@ fn main() -> Result<()> {
         );
     }
 
-    if !args.error {
-        println!(
-            "{:.6} {} {} {}",
-            average.mean(),
-            args.num_points,
-            args.num_trials,
-            args.dimension
-        );
-    } else {
-        println!(
-            "{} ± {} {} {} {}",
+    // Decide how to format result
+    let result = if args.error {
+        format!(
+            "{} ± {}",
             format!("{:.6}", average.mean()).green(),
-            format!("{:.6}", average.error()).red(),
-            args.num_points,
-            args.num_trials,
-            args.dimension
-        );
-    }
+            format!("{:.6}", average.error()).red()
+        )
+    } else {
+        format!("{:.6}", average.mean())
+    };
+
+    println!(
+        "{} {} {} {}",
+        result, args.num_points, args.num_trials, args.dimension
+    );
 
     Ok(())
 }

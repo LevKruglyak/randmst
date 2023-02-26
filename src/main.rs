@@ -79,8 +79,8 @@ fn main() -> Result<()> {
         let error = Duration::from_secs_f64(average_time.error());
         println!(
             "time per trial: {} ± {}",
-            format!("{:?}", mean).green(),
-            format!("{:?}", error).red(),
+            format!("{mean:?}").green(),
+            format!("{error:?}").red(),
         );
     }
 

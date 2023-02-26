@@ -47,11 +47,12 @@ impl<R: RngCore> FatComponentSampler<R> {
         self.weight += self.rng.sample::<f64, _>(Exp1) / self.set.free_edges() as f64;
 
         // Update the fat component
-        self.fat_component
-            .as_mut()
-            .map(|component| update_fat_component(&mut self.set, component));
+        if let Some(component) = self.fat_component.as_mut() {
+            update_fat_component(&mut self.set, component)
+        }
 
-        if self.set.free_edges() * 2 < self.set.total_edges() && self.fat_component.is_none() {
+        // If we haven't found a fat component yet, look for it!
+        if (self.set.free_edges() * 2 < self.set.total_edges()) & self.fat_component.is_none() {
             self.fat_component = find_fat_component(&mut self.set);
         }
 
@@ -91,10 +92,17 @@ fn update_fat_component(set: &mut RemUnionFind, component: &mut FatComponent) {
     component.size = set.size(component.root);
 
     if (set.points() - component.size) * 2 < component.remainders.len() as u32 {
-        // TODO: is `retain` or `collect` better?
-        component
+        // Marginally faster than retain (filter rate is too low for retain to be effective)
+        component.remainders = component
             .remainders
-            .retain(|point| set.root(*point) != component.root);
+            .iter()
+            .copied()
+            .filter(|point| set.root(*point) != component.root)
+            .collect();
+
+        // component
+        //     .remainders
+        //     .retain(|point| set.root(*point) != component.root);
     }
 }
 
@@ -109,6 +117,7 @@ fn sample_sparse_edge(rng: &mut impl RngCore, set: &mut RemUnionFind) -> (Point,
     }
 }
 
+#[allow(clippy::needless_return)]
 fn sample_component_edge(
     rng: &mut impl RngCore,
     set: &mut RemUnionFind,

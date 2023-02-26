@@ -26,7 +26,7 @@ pub struct RemUnionFind {
 impl RemUnionFind {
     pub fn new(size: u32) -> Self {
         Self {
-            parents: (0..size).into_iter().map(|x| Point::root(x)).collect(),
+            parents: (0..size).into_iter().map(Point::root).collect(),
             sizes: (0..size).into_iter().map(|_| 1).collect(),
             size,
             total_edges: (size as usize) * (size as usize - 1) / 2,

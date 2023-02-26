@@ -42,8 +42,24 @@ impl SizedKruskalUnionFind for SizedRemUnionFind {
         None
     }
 
-    fn same_set(&mut self, u: u32, v: u32) -> bool {
-        self.find(u) == self.find(v)
+    fn same_set(&mut self, mut u: u32, mut v: u32) -> bool {
+        let u_orig = u;
+        let v_orig = v;
+
+        if (u == self[u]) && (v == self[v]) {
+            return u == v;
+        }
+
+        while (u != self[u]) || (v != self[v]) {
+            u = self[u];
+            v = self[v];
+        }
+
+        // Path splitting step
+        self[u_orig] = u;
+        self[v_orig] = v;
+
+        u == v
     }
 
     fn find(&mut self, mut u: u32) -> u32 {
@@ -54,6 +70,7 @@ impl SizedKruskalUnionFind for SizedRemUnionFind {
             u = self[u];
         }
 
+        // Path splitting step
         self[u_orig] = u;
 
         u

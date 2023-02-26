@@ -157,14 +157,9 @@ impl<U: SizedKruskalUnionFind> FatComponentGenerator<U> {
                 if (self.size - self.union_find.size(fat_component)) * 2
                     < self.remainders.len() as u32
                 {
-                    let mut new_remainders = Vec::new();
                     let fat_root = self.union_find.find(fat_component);
-                    for &v in &self.remainders {
-                        if self.union_find.find(v) != fat_root {
-                            new_remainders.push(v);
-                        }
-                    }
-                    self.remainders = new_remainders;
+                    self.remainders
+                        .retain(|point| self.union_find.find(*point) != fat_root);
                 }
             }
             None => {}

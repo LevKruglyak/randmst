@@ -249,7 +249,7 @@ impl FatComponentUnionFind {
         loop {
             let index = rng.gen_range(0..remainders.len());
             let point = remainders[index];
-            if self.root(point) != point {
+            if self.root(point) != component {
                 return point;
             }
         }

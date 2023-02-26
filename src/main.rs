@@ -1,9 +1,13 @@
 #![feature(test)]
-#![allow(unused, dead_code)]
-use std::time::Instant;
+// #![allow(unused, dead_code)]
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
+use average::MeanWithError;
 use clap::Parser;
+use colored::Colorize;
+use rand::{thread_rng, Rng, RngCore};
+use rand_distr::Uniform;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub mod zero_dim;
@@ -29,17 +33,22 @@ struct Args {
 
     #[arg(short, long, help = "Run each trial in series (for debugging)")]
     no_parallel: bool,
+
+    #[arg(short, long, help = "Also display the error of the result")]
+    error: bool,
 }
 
-fn run_trial_zero_dim(num_points: u32) -> f64 {
-    zero_dim::mst(num_points)
+fn run_trial_zero_dim(num_points: u32, rng: impl RngCore) -> f64 {
+    zero_dim::mst(num_points, rng)
 }
 
-fn run_trial(num_points: u32, dimension: u32) -> f64 {
-    match dimension {
-        0 => run_trial_zero_dim(num_points),
+fn run_trial(num_points: u32, dimension: u32, rng: impl RngCore) -> (f64, Duration) {
+    let start = Instant::now();
+    let mst = match dimension {
+        0 => run_trial_zero_dim(num_points, rng),
         _ => 0.0,
-    }
+    };
+    (mst, start.elapsed())
 }
 
 fn main() -> Result<()> {
@@ -48,24 +57,51 @@ fn main() -> Result<()> {
         return Err(anyhow!("dimension 1 is not supported!"));
     }
 
-    let start = Instant::now();
-    let average = if args.no_parallel {
+    let timed_trials: Vec<(f64, Duration)> = if args.no_parallel {
         (0..args.num_trials)
             .into_iter()
-            .map(|_| run_trial(args.num_points, args.dimension))
-            .sum::<f64>()
+            .map(|_| run_trial(args.num_points, args.dimension, thread_rng()))
+            .collect()
     } else {
         (0..args.num_trials)
             .into_par_iter()
-            .map(|_| run_trial(args.num_points, args.dimension))
-            .sum::<f64>()
-    } / args.num_trials as f64;
-    println!("elapsed {:?}", start.elapsed());
+            .map(|_| run_trial(args.num_points, args.dimension, thread_rng()))
+            .collect()
+    };
 
-    println!(
-        "{:.6} {} {} {}",
-        average, args.num_points, args.num_trials, args.dimension
-    );
+    // Calculate average and variance
+    let average: MeanWithError = timed_trials.iter().map(|x| x.0).collect();
+
+    // Display time calculations
+    if args.time {
+        let average_time: MeanWithError = timed_trials.iter().map(|x| x.1.as_secs_f64()).collect();
+        let mean = Duration::from_secs_f64(average_time.mean());
+        let error = Duration::from_secs_f64(average_time.error());
+        println!(
+            "time per trial: {} ± {}",
+            format!("{:?}", mean).green(),
+            format!("{:?}", error).red(),
+        );
+    }
+
+    if !args.error {
+        println!(
+            "{:.6} {} {} {}",
+            average.mean(),
+            args.num_points,
+            args.num_trials,
+            args.dimension
+        );
+    } else {
+        println!(
+            "{} ± {} {} {} {}",
+            format!("{:.6}", average.mean()).green(),
+            format!("{:.6}", average.error()).red(),
+            args.num_points,
+            args.num_trials,
+            args.dimension
+        );
+    }
 
     Ok(())
 }

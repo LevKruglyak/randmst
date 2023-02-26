@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use rand_distr::{Distribution, Uniform};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
@@ -97,6 +95,7 @@ impl RemUnionFind {
         self.total_edges - self.total_internal
     }
 
+    /// The total number of edges between all of the points
     pub fn total_edges(&self) -> usize {
         self.total_edges
     }
@@ -220,16 +219,12 @@ mod tests {
     }
 }
 
-extern crate test;
-
 #[cfg(test)]
 mod benchmarks {
+    extern crate test;
+    use super::RemUnionFind;
     use rand::{thread_rng, Rng};
-
-    use super::{
-        test::{black_box, Bencher},
-        Point, RemUnionFind,
-    };
+    use test::{black_box, Bencher};
 
     const NUM_POINTS: u32 = 100_000;
 

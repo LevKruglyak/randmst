@@ -9,12 +9,13 @@ use colored::Colorize;
 use rand::{thread_rng, RngCore};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
-pub mod zero_dim;
+pub mod complete;
+pub mod euclidean;
 
 #[derive(Parser, Debug)]
 #[command(name = "randmst")]
 #[command(version = "1.0")]
-#[command(about = "Blazingly fast implementation of CS124 progset1", long_about = None)]
+#[command(about = "Blazingly fast sampler of minimum spanning trees of a random (Euclidean) complete graph.", long_about = None)]
 struct Args {
     _ne: u32,
     #[arg(help = "Number of points per graph.")]
@@ -38,7 +39,7 @@ struct Args {
 }
 
 fn run_trial_zero_dim(num_points: u32, rng: impl RngCore) -> f64 {
-    zero_dim::mst(num_points, rng)
+    complete::mst(num_points, rng)
 }
 
 fn run_trial(num_points: u32, dimension: u32, rng: impl RngCore) -> (f64, Duration) {

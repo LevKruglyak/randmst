@@ -20,7 +20,7 @@ impl FatComponent {
 }
 
 pub struct FatComponentSampler<R: RngCore> {
-    weight: f64,
+    inv_weight: f64,
     fat_component: Option<FatComponent>,
     total_count: u32,
     set: RemUnionFind,
@@ -30,7 +30,7 @@ pub struct FatComponentSampler<R: RngCore> {
 impl<R: RngCore> FatComponentSampler<R> {
     pub fn new(rng: R, size: u32) -> Self {
         Self {
-            weight: 0.0,
+            inv_weight: 1.0,
             rng,
             set: RemUnionFind::new(size),
             total_count: size - 1,
@@ -43,8 +43,14 @@ impl<R: RngCore> FatComponentSampler<R> {
             return None;
         }
 
-        // Proper distribution
-        self.weight += self.rng.sample::<f64, _>(Exp1) / self.set.free_edges() as f64;
+        // When `free_edges` large enough, we can use an approximate distribution
+        // to speed up computation
+        if self.set.free_edges() > 65_536 {
+            self.inv_weight -= self.rng.sample::<f64, _>(Exp1) / self.set.free_edges() as f64;
+        } else {
+            self.inv_weight *=
+                (-self.rng.sample::<f64, _>(Exp1) / self.set.free_edges() as f64).exp();
+        }
 
         // Update the fat component
         if let Some(component) = self.fat_component.as_mut() {
@@ -63,7 +69,7 @@ impl<R: RngCore> FatComponentSampler<R> {
 
         self.set.unite(edge.0, edge.1);
         self.total_count -= 1;
-        Some(self.weight)
+        Some(1.0 - self.inv_weight)
     }
 }
 

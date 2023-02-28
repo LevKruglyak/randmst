@@ -12,6 +12,8 @@ impl Point {
 pub struct RemUnionFind {
     /// Sends each Point (as a usize) to its Parent. (roots are self-parent)
     parents: Vec<Point>,
+    // // offset
+    // parents: Vec<u16>,
     sizes: Vec<u32>,
 
     // Metadata to keep track of sizes for sampling purposes

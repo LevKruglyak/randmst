@@ -438,9 +438,11 @@ dependencies = [
  "clap",
  "colored",
  "derive_more",
+ "num-traits",
  "rand",
  "rand_distr",
  "rayon",
+ "smallvec",
 ]
 
 [[package]]
@@ -499,6 +501,12 @@ name = "semver"
 version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58bc9567378fc7690d6b2addae4e60ac2eeea07becb2c64b9f218b53865cba2a"
+
+[[package]]
+name = "smallvec"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "strsim"

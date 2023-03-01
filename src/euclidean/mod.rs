@@ -57,7 +57,7 @@ mod tests {
             .collect();
 
         b.iter(|| {
-            let morton: Vec<u32> = black_box(points.iter().map(|x| x.morton_encode(32)).collect());
+            let morton: Vec<u32> = black_box(points.iter().map(|x| x.morton_encode()).collect());
             morton
         });
     }

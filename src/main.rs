@@ -1,5 +1,5 @@
 #![feature(test, portable_simd)]
-// #![allow(unused, dead_code)]
+#![allow(unused, dead_code)]
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
@@ -10,7 +10,7 @@ use rand::{thread_rng, RngCore};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub mod complete;
-pub mod euclidean;
+// pub mod euclidean;
 
 #[derive(Parser, Debug)]
 #[command(name = "randmst")]
@@ -43,12 +43,13 @@ fn run_trial_zero_dim(num_points: u32, rng: impl RngCore) -> f64 {
 }
 
 fn run_trial_n_dim(num_points: u32, dimension: u32, rng: impl RngCore) -> f64 {
-    match dimension {
-        2 => euclidean::mst::<2>(num_points, rng),
-        3 => euclidean::mst::<3>(num_points, rng),
-        4 => euclidean::mst::<4>(num_points, rng),
-        _ => unimplemented!(),
-    }
+    0.0
+    // match dimension {
+    //     2 => euclidean::mst::<2>(num_points, rng),
+    //     3 => euclidean::mst::<3>(num_points, rng),
+    //     4 => euclidean::mst::<4>(num_points, rng),
+    //     _ => unimplemented!(),
+    // }
 }
 
 fn run_trial(num_points: u32, dimension: u32, rng: impl RngCore) -> (f64, Duration) {

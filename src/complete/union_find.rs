@@ -15,22 +15,42 @@ const SENTINEL_MASK: u32 = !SENTINEL;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub struct ParentLink(u32);
 
+pub enum ParentLinkContent {
+    Parent(Point),
+    Size(u32),
+}
+
 impl ParentLink {
     fn root(_id: u32) -> Self {
-        Self(SENTINEL)
+        Self(SENTINEL | 1)
     }
 
     fn is_root(&self) -> bool {
         self.0 & SENTINEL != 0
+    }
+
+    fn link(&mut self, parent: Point) {
+        // assert_eq!(parent.0 & SENTINEL_MASK, parent.0);
+        self.0 = parent.0
+    }
+
+    fn get_content(&self) -> ParentLinkContent {
+        if self.is_root() {
+            ParentLinkContent::Size(self.0 & SENTINEL_MASK)
+        } else {
+            ParentLinkContent::Parent(Point(self.0))
+        }
+    }
+
+    fn inc_size(&mut self, size: u32) {
+        // assert!(self.is_root());
+        self.0 += size;
     }
 }
 
 pub struct RemUnionFind {
     /// Sends each Point (as a usize) to its Parent. (roots are self-parent)
     parents: Vec<ParentLink>,
-    // // offset
-    // parents: Vec<u16>,
-    sizes: Vec<u32>,
 
     // Metadata to keep track of sizes for sampling purposes
     size: u32,
@@ -45,7 +65,6 @@ impl RemUnionFind {
     pub fn new(size: u32) -> Self {
         Self {
             parents: (0..size).into_iter().map(ParentLink::root).collect(),
-            sizes: (0..size).into_iter().map(|_| 1).collect(),
             size,
             total_edges: (size as usize) * (size as usize - 1) / 2,
             total_internal: 0,
@@ -131,6 +150,10 @@ impl RemUnionFind {
 
     /// Traverse to the root, splitting paths on the way
     pub fn root(&mut self, u: Point) -> Point {
+        if self.is_root(u) {
+            return u;
+        }
+
         let mut root = u;
 
         while !self.is_root(root) {
@@ -145,36 +168,42 @@ impl RemUnionFind {
 
     pub fn size(&mut self, u: Point) -> u32 {
         let root = self.root(u);
-        self.sizes[root.0 as usize]
+        // TODO: FIX!!!
+        self.root_size(root).unwrap()
     }
 
     /// If `u` is a root, will return `Some(size)`, otherwise `None`
     fn root_size(&self, u: Point) -> Option<u32> {
-        if self.is_root(u) {
-            Some(self.sizes[u.0 as usize])
-        } else {
-            None
+        match self.parents[u.0 as usize].get_content() {
+            ParentLinkContent::Size(size) => Some(size),
+            ParentLinkContent::Parent(_) => None,
         }
     }
 
     // Add a size to the given set, return the original size
     fn add_size_to_root(&mut self, point: Point, size: u32) -> (u32, Point) {
         let root = self.root(point);
-        let original_size = self.sizes[root.0 as usize];
-        self.sizes[root.0 as usize] += size;
+        let original_size = self.size(root);
+        self.parents[root.0 as usize].inc_size(size);
         (original_size, root)
     }
 
     fn link(&mut self, src: Point, dst: Point) {
-        self.parents[src.0 as usize] = dst
+        // To avoid overwriting infinte loop
+        if src != dst {
+            self.parents[src.0 as usize].link(dst);
+        }
     }
 
     fn parent(&self, u: Point) -> Point {
-        self.parents[u.0 as usize]
+        match self.parents[u.0 as usize].get_content() {
+            ParentLinkContent::Size(_) => u,
+            ParentLinkContent::Parent(parent) => parent,
+        }
     }
 
     fn is_root(&self, u: Point) -> bool {
-        self.parent(u) == u
+        self.parents[u.0 as usize].is_root()
     }
 }
 
@@ -212,8 +241,20 @@ mod tests {
         let mut set = RemUnionFind::new(10);
         assert!(set.is_root(Point(2)));
         assert!(set.is_root(Point(3)));
+        assert!(!set.same_set(Point(3), Point(2)));
+        set.link(Point(2), Point(3));
+        assert_eq!(set.root(Point(2)), Point(3));
+        assert_eq!(set.root(Point(3)), Point(3));
+    }
+
+    #[test]
+    fn unite() {
+        let mut set = RemUnionFind::new(10);
         set.unite(Point(2), Point(3));
-        assert!(set.is_root(Point(3)));
+        set.unite(Point(3), Point(4));
+        assert_eq!(set.root(Point(2)), Point(4));
+        assert_eq!(set.root(Point(3)), Point(4));
+        assert_eq!(set.root(Point(4)), Point(4));
     }
 
     #[test]

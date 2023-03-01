@@ -9,9 +9,25 @@ impl Point {
     }
 }
 
+const SENTINEL: u32 = 1 << 31;
+const SENTINEL_MASK: u32 = !SENTINEL;
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
+pub struct ParentLink(u32);
+
+impl ParentLink {
+    fn root(_id: u32) -> Self {
+        Self(SENTINEL)
+    }
+
+    fn is_root(&self) -> bool {
+        self.0 & SENTINEL != 0
+    }
+}
+
 pub struct RemUnionFind {
     /// Sends each Point (as a usize) to its Parent. (roots are self-parent)
-    parents: Vec<Point>,
+    parents: Vec<ParentLink>,
     // // offset
     // parents: Vec<u16>,
     sizes: Vec<u32>,
@@ -28,7 +44,7 @@ pub struct RemUnionFind {
 impl RemUnionFind {
     pub fn new(size: u32) -> Self {
         Self {
-            parents: (0..size).into_iter().map(Point::root).collect(),
+            parents: (0..size).into_iter().map(ParentLink::root).collect(),
             sizes: (0..size).into_iter().map(|_| 1).collect(),
             size,
             total_edges: (size as usize) * (size as usize - 1) / 2,

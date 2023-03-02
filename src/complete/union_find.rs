@@ -104,7 +104,7 @@ impl SizedUnionFind {
     /// component. Returns `None` if these two points are in the same component
     pub fn unite(&mut self, mut u: Point, mut v: Point) -> bool {
         // Do aggressive path compression during unite operation
-        let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
+        // let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
 
         while self.parent(u) != self.parent(v) {
             // Make sure we're oriented properly to keep root nodes
@@ -120,9 +120,9 @@ impl SizedUnionFind {
                 let (root, size) = self.root_size(v);
                 self[root].set(&LinkSizeCompact::root(size + join_size));
 
-                for p in queue {
-                    self.link(p, root);
-                }
+                // for p in queue {
+                //     self.link(p, root);
+                // }
 
                 // Update total internal edges
                 self.total_internal += size as usize * join_size as usize;
@@ -131,8 +131,8 @@ impl SizedUnionFind {
             }
 
             let temp = self.parent(u);
-            queue.push(u);
-            // self.link(u, self.parent(v));
+            // queue.push(u);
+            self.link(u, self.parent(v));
             u = temp;
         }
 

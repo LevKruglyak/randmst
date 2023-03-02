@@ -81,6 +81,9 @@ pub struct SizedUnionFind {
     total_edges: usize,
     total_internal: usize,
 
+    // A queue for aggressive path compression
+    queue: Vec<Point>,
+
     // Marginal speedup when storing distribution object
     vertex_distr: Uniform<u32>,
 }
@@ -95,6 +98,7 @@ impl SizedUnionFind {
                 .collect(),
             size,
             total_edges: (size as usize) * (size as usize - 1) / 2,
+            queue: Vec::new(),
             total_internal: 0,
             vertex_distr: Uniform::new(0, size),
         }
@@ -104,7 +108,14 @@ impl SizedUnionFind {
     /// component. Returns `None` if these two points are in the same component
     pub fn unite(&mut self, mut u: Point, mut v: Point) -> bool {
         // Do aggressive path compression during unite operation
+<<<<<<< HEAD
         // let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
+||||||| bbc40eb
+        let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
+=======
+        self.queue.clear(); // Slightly faster than keeping local one
+                            // let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
+>>>>>>> sentinel
 
         while self.parent(u) != self.parent(v) {
             // Make sure we're oriented properly to keep root nodes
@@ -120,9 +131,19 @@ impl SizedUnionFind {
                 let (root, size) = self.root_size(v);
                 self[root].set(&LinkSizeCompact::root(size + join_size));
 
+<<<<<<< HEAD
                 // for p in queue {
                 //     self.link(p, root);
                 // }
+||||||| bbc40eb
+                for p in queue {
+                    self.link(p, root);
+                }
+=======
+                for &p in &self.queue {
+                    self.link(p, root);
+                }
+>>>>>>> sentinel
 
                 // Update total internal edges
                 self.total_internal += size as usize * join_size as usize;
@@ -131,8 +152,16 @@ impl SizedUnionFind {
             }
 
             let temp = self.parent(u);
+<<<<<<< HEAD
             // queue.push(u);
             self.link(u, self.parent(v));
+||||||| bbc40eb
+            queue.push(u);
+            // self.link(u, self.parent(v));
+=======
+            self.queue.push(u);
+            // self.link(u, self.parent(v));
+>>>>>>> sentinel
             u = temp;
         }
 

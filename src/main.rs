@@ -38,12 +38,19 @@ struct Args {
     error: bool,
 }
 
-fn run_trial_zero_dim(num_points: u32, rng: impl RngCore) -> f64 {
+/// An edge object that the MST should return
+pub struct Edge {
+    u: u32,
+    v: u32,
+    w: f64,
+}
+
+fn run_trial_zero_dim(num_points: u32, rng: impl RngCore) -> Vec<Edge> {
     complete::mst(num_points, rng)
 }
 
-fn run_trial_n_dim(num_points: u32, dimension: u32, rng: impl RngCore) -> f64 {
-    0.0
+fn run_trial_n_dim(num_points: u32, dimension: u32, rng: impl RngCore) -> Vec<Edge> {
+    Vec::new()
     // match dimension {
     //     2 => euclidean::mst::<2>(num_points, rng),
     //     3 => euclidean::mst::<3>(num_points, rng),
@@ -58,7 +65,8 @@ fn run_trial(num_points: u32, dimension: u32, rng: impl RngCore) -> (f64, Durati
         0 => run_trial_zero_dim(num_points, rng),
         n => run_trial_n_dim(num_points, dimension, rng),
     };
-    (mst, start.elapsed())
+    let duration = start.elapsed();
+    (mst.into_par_iter().map(|x| x.w).sum::<f64>(), duration)
 }
 
 fn main() -> Result<()> {

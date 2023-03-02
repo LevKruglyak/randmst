@@ -9,6 +9,12 @@ use smallvec::SmallVec;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub struct Point(u32);
 
+impl Point {
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+}
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub struct LinkSizeCompact {
     data: Cell<u32>,

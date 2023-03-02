@@ -1,19 +1,14 @@
 use rand::RngCore;
 
+use crate::Edge;
+
 use self::sampler::FatComponentSampler;
 
 mod sampler;
 pub mod union_find;
 
-pub fn mst(size: u32, rng: impl RngCore) -> f64 {
-    let mut sampler = FatComponentSampler::new(rng, size);
-    let mut total_weight = 0.0;
-
-    while let Some(weight) = sampler.sample() {
-        total_weight += weight;
-    }
-
-    total_weight
+pub fn mst<R: RngCore>(size: u32, rng: R) -> Vec<Edge> {
+    FatComponentSampler::<R>::new(rng, size).collect()
 }
 
 #[cfg(all(test, feature = "benchmark"))]

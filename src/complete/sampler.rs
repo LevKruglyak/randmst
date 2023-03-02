@@ -1,6 +1,8 @@
 use rand::{Rng, RngCore};
 use rand_distr::Exp1;
 
+use crate::Edge;
+
 use super::union_find::{Point, SizedUnionFind};
 
 pub struct FatComponent {
@@ -27,18 +29,10 @@ pub struct FatComponentSampler<R: RngCore> {
     rng: R,
 }
 
-impl<R: RngCore> FatComponentSampler<R> {
-    pub fn new(rng: R, size: u32) -> Self {
-        Self {
-            inv_weight: 1.0,
-            rng,
-            set: SizedUnionFind::new(size),
-            total_count: size - 1,
-            fat_component: None,
-        }
-    }
+impl<R: RngCore> Iterator for FatComponentSampler<R> {
+    type Item = Edge;
 
-    pub fn sample(&mut self) -> Option<f64> {
+    fn next(&mut self) -> Option<Self::Item> {
         if self.set.free_edges() == 0 || self.total_count == 0 {
             return None;
         }
@@ -73,7 +67,24 @@ impl<R: RngCore> FatComponentSampler<R> {
             }
 
             self.total_count -= 1;
-            return Some(1.0 - self.inv_weight);
+
+            return Some(Edge {
+                u: edge.0.as_u32(),
+                v: edge.1.as_u32(),
+                w: 1.0 - self.inv_weight,
+            });
+        }
+    }
+}
+
+impl<R: RngCore> FatComponentSampler<R> {
+    pub fn new(rng: R, size: u32) -> Self {
+        Self {
+            inv_weight: 1.0,
+            rng,
+            set: SizedUnionFind::new(size),
+            total_count: size - 1,
+            fat_component: None,
         }
     }
 }

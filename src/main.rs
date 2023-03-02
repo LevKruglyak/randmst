@@ -43,13 +43,12 @@ fn run_trial_zero_dim(num_points: u32, rng: impl RngCore) -> f64 {
 }
 
 fn run_trial_n_dim(num_points: u32, dimension: u32, rng: impl RngCore) -> f64 {
-    0.0
-    // match dimension {
-    //     2 => euclidean::mst::<2>(num_points, rng),
-    //     3 => euclidean::mst::<3>(num_points, rng),
-    //     4 => euclidean::mst::<4>(num_points, rng),
-    //     _ => unimplemented!(),
-    // }
+    match dimension {
+        2 => euclidean::mst::<2>(num_points, rng),
+        3 => euclidean::mst::<3>(num_points, rng),
+        4 => euclidean::mst::<4>(num_points, rng),
+        _ => unimplemented!(),
+    }
 }
 
 fn run_trial(num_points: u32, dimension: u32, rng: impl RngCore) -> (f64, Duration) {

@@ -7,6 +7,7 @@ use self::{
     spatial::SpatialVec,
 };
 
+mod merge;
 mod morton;
 mod point;
 mod spatial;
@@ -57,7 +58,7 @@ mod tests {
             .collect();
 
         b.iter(|| {
-            let morton: Vec<u32> = black_box(points.iter().map(|x| x.morton_encode()).collect());
+            let morton: Vec<usize> = black_box(points.iter().map(|x| x.morton_encode(4)).collect());
             morton
         });
     }

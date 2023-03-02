@@ -9,42 +9,43 @@ impl<const D: usize> Point<D> {
 
         for i in 0..D {
             let delt = self.0[i].wrapping_sub(point.0[i]) as u128;
-            sum += delt.wrapping_mul(delt);
+            sum = sum.wrapping_add(delt.wrapping_mul(delt));
         }
 
-        (sum >> FIXED_RESOLUTION) as u64
+        (sum >> u64::BITS) as u64
     }
 
-    fn round_to_u8(&self) -> [u8; D] {
-        self.0.map(|x| (x >> (FIXED_RESOLUTION - u8::BITS)) as u8)
+    fn round_to_u32(&self) -> [u32; D] {
+        // GODBOLT: bit shift gets optimized away, SIMD in D=4
+        self.0.map(|x| (x >> (u64::BITS - u32::BITS)) as u32)
+    }
+
+    fn round_to(&self, bits: u32) -> [u32; D] {
+        self.0.map(|x| (x >> (u64::BITS - bits)) as u32)
     }
 }
 
 impl Morton for Point<2> {
-    fn morton_encode(&self) -> u32 {
-        morton_encode_2(self.round_to_u8())
+    fn morton_encode(&self, resolution: u32) -> usize {
+        morton_encode_2(self.round_to(resolution))
     }
 }
 
 impl Morton for Point<3> {
-    fn morton_encode(&self) -> u32 {
-        morton_encode_3(self.round_to_u8())
+    fn morton_encode(&self, resolution: u32) -> usize {
+        morton_encode_3(self.round_to(resolution))
     }
 }
 
 impl Morton for Point<4> {
-    fn morton_encode(&self) -> u32 {
-        morton_encode_4(self.round_to_u8())
+    fn morton_encode(&self, resolution: u32) -> usize {
+        morton_encode_4(self.round_to(resolution))
     }
 }
 
-// 52 bits of precision
-const FIXED_RESOLUTION: u32 = 52;
-const FIXED_MASK: u64 = 0x000F_FFFF_FFFF_FFFF;
-const FIXED_UNIT: u64 = 0x0010_0000_0000_0000;
-
 fn mul_fixed(x: u64, y: u64) -> u64 {
-    ((x as u128) * (y as u128) >> FIXED_RESOLUTION) as u64
+    // GODBOLT: completely optimized to a `mul` and `mov`
+    ((x as u128) * (y as u128) >> u64::BITS) as u64
 }
 
 fn add_fixed(x: u64, y: u64) -> u64 {
@@ -52,7 +53,10 @@ fn add_fixed(x: u64, y: u64) -> u64 {
 }
 
 pub fn fixed_to_float(x: u64) -> f64 {
-    x as f64 / (FIXED_UNIT as f64)
+    const MANTISSA_BITS: usize = 52;
+    const FIXED_UNIT: u64 = 0x0100_0000_0000_0000;
+
+    (x >> (u64::BITS - 52)) as f64 / (FIXED_UNIT as f64)
 }
 
 pub struct Hypercube<const D: usize>;
@@ -61,7 +65,7 @@ macro_rules! hypercube_impl {
     ($D:expr) => {
         impl Distribution<Point<$D>> for Hypercube<$D> {
             fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Point<$D> {
-                Point(rng.gen::<[u64; $D]>().map(|x| x & FIXED_MASK))
+                Point(rng.gen::<[u64; $D]>())
             }
         }
     };
@@ -76,7 +80,7 @@ mod tests {
     use rand::{thread_rng, Rng};
     use test::{black_box, Bencher};
 
-    use super::{Hypercube, Point};
+    use super::{fixed_to_float, Hypercube, Point};
 
     extern crate test;
 
@@ -105,6 +109,15 @@ mod tests {
 
                 black_box(dist2)
             });
+        });
+    }
+
+    #[bench]
+    fn convert_back_to_float(b: &mut Bencher) {
+        let point: u64 = thread_rng().gen();
+
+        b.iter(|| {
+            black_box(fixed_to_float(point));
         });
     }
 }

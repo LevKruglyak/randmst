@@ -36,26 +36,40 @@ fn space_bits_4(x: u32) -> u32 {
     x
 }
 
-pub fn morton_encode_2(point: [u8; 2]) -> u32 {
-    space_bits_2(point[0] as u32) | space_bits_2(point[1] as u32) << 1
+pub fn morton_encode_2(point: [u32; 2]) -> usize {
+    (space_bits_2(point[0]) | space_bits_2(point[1]) << 1) as usize
 }
 
-pub fn morton_encode_3(point: [u8; 3]) -> u32 {
-    space_bits_3(point[0] as u32)
-        | space_bits_3(point[1] as u32) << 1
-        | space_bits_3(point[2] as u32) << 2
+pub fn morton_encode_3(point: [u32; 3]) -> usize {
+    (space_bits_3(point[0]) | space_bits_3(point[1]) << 1 | space_bits_3(point[2]) << 2) as usize
 }
 
-pub fn morton_encode_4(point: [u8; 4]) -> u32 {
-    space_bits_4(point[0] as u32)
-        | space_bits_4(point[1] as u32) << 1
-        | space_bits_4(point[2] as u32) << 2
-        | space_bits_4(point[3] as u32) << 3
+pub fn morton_encode_4(point: [u32; 4]) -> usize {
+    (space_bits_4(point[0])
+        | space_bits_4(point[1]) << 1
+        | space_bits_4(point[2]) << 2
+        | space_bits_4(point[3]) << 3) as usize
 }
 
 pub trait Morton {
-    fn morton_encode(&self) -> u32;
+    fn morton_encode(&self, resolution: u32) -> usize;
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::morton_encode_2;
+
+    #[test]
+    fn simple_2() {
+        assert_eq!(morton_encode_2([0b1, 0b1]), 0b11);
+        assert_eq!(morton_encode_2([0b0, 0b1]), 0b10);
+        assert_eq!(morton_encode_2([0b1, 0b0]), 0b01);
+        assert_eq!(morton_encode_2([0b1111, 0b0000]), 0b01010101);
+    }
+
+    #[test]
+    fn simple_3() {}
+
+    #[test]
+    fn simple_4() {}
+}

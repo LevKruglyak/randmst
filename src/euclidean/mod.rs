@@ -7,6 +7,7 @@ use self::{
     spatial::SpatialVec,
 };
 
+mod aabb;
 mod merge;
 mod morton;
 mod point;

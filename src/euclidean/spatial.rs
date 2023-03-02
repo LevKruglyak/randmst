@@ -1,21 +1,26 @@
 use smallvec::SmallVec;
 
-use super::{morton::Morton, point::Point};
+use super::{aabb::AABB, morton::Morton, point::Point};
 
 /// A set of points representing the recursion level
 /// at which it becomes more efficient to simply do
 /// a direct MST algorithm on the complete graph
 pub struct BaseCell<const D: usize> {
     points: SmallVec<[Point<D>; 8]>,
+    bounds: AABB<D>,
 }
-
-// pub struct
 
 impl<const D: usize> BaseCell<D> {
     fn new() -> Self {
         Self {
             points: SmallVec::new(),
+            bounds: AABB::default(),
         }
+    }
+
+    fn push(&mut self, point: Point<D>) {
+        self.points.push(point);
+        self.bounds = AABB::expand(self.bounds.clone(), point);
     }
 }
 
@@ -46,7 +51,7 @@ where
 
         for point in points {
             let index = point.morton_encode(resolution);
-            cells[index].points.push(point);
+            cells[index].push(point);
         }
 
         let mut avg = 0_usize;

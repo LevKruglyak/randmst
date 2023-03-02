@@ -56,24 +56,18 @@ impl<R: RngCore> Iterator for FatComponentSampler<R> {
             self.fat_component = find_fat_component(&mut self.set);
         }
 
-        loop {
-            let edge = match &self.fat_component {
-                Some(component) => sample_component_edge(&mut self.rng, &mut self.set, component),
-                None => sample_sparse_edge(&mut self.rng, &mut self.set),
-            };
+        let edge = match &self.fat_component {
+            Some(component) => sample_component_edge(&mut self.rng, &mut self.set, component),
+            None => sample_sparse_edge(&mut self.rng, &mut self.set),
+        };
 
-            if !self.set.unite(edge.0, edge.1) {
-                continue;
-            }
+        self.total_count -= 1;
 
-            self.total_count -= 1;
-
-            return Some(Edge {
-                u: edge.0.as_u32(),
-                v: edge.1.as_u32(),
-                w: 1.0 - self.inv_weight,
-            });
-        }
+        return Some(Edge {
+            u: edge.0.as_u32(),
+            v: edge.1.as_u32(),
+            w: 1.0 - self.inv_weight,
+        });
     }
 }
 
@@ -133,7 +127,7 @@ fn sample_sparse_edge(rng: &mut impl RngCore, set: &mut SizedUnionFind) -> (Poin
         // TODO: figure out trait issue
         let u = rng.sample(&*set);
         let v = rng.sample(&*set);
-        if !set.same_set(u, v) {
+        if set.unite(u, v) {
             return (u, v);
         }
     }
@@ -151,14 +145,15 @@ fn sample_component_edge(
 
     if rng.gen_bool((fat_size as usize * remainder_size as usize) as f64 / active as f64) {
         let u = sample_component(rng, set, component);
-        let v = sample_remainder(rng, set, component); // assert!(!set.same_set(u, v));
-                                                       // assert!(!set.same_set(u, v));
+        let v = sample_remainder(rng, set, component);
+
+        assert!(set.unite(u, v));
         return (u, v);
     } else {
         loop {
             let u = sample_remainder(rng, set, component);
             let v = sample_remainder(rng, set, component);
-            if !set.same_set(u, v) {
+            if set.unite(u, v) {
                 return (u, v);
             }
         }

@@ -75,6 +75,8 @@ pub struct SizedUnionFind {
     total_edges: usize,
     total_internal: usize,
 
+    queue: Vec<Point>,
+
     // Marginal speedup when storing distribution object
     vertex_distr: Uniform<u32>,
 }
@@ -89,6 +91,7 @@ impl SizedUnionFind {
                 .collect(),
             size,
             total_edges: (size as usize) * (size as usize - 1) / 2,
+            queue: Vec::new(),
             total_internal: 0,
             vertex_distr: Uniform::new(0, size),
         }
@@ -98,7 +101,8 @@ impl SizedUnionFind {
     /// component. Returns `None` if these two points are in the same component
     pub fn unite(&mut self, mut u: Point, mut v: Point) -> bool {
         // Do aggressive path compression during unite operation
-        let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
+        self.queue.clear();
+        // let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
 
         while self.parent(u) != self.parent(v) {
             // Make sure we're oriented properly to keep root nodes
@@ -114,7 +118,7 @@ impl SizedUnionFind {
                 let (root, size) = self.root_size(v);
                 self[root].set(&LinkSizeCompact::root(size + join_size));
 
-                for p in queue {
+                for &p in &self.queue {
                     self.link(p, root);
                 }
 
@@ -125,7 +129,7 @@ impl SizedUnionFind {
             }
 
             let temp = self.parent(u);
-            queue.push(u);
+            self.queue.push(u);
             // self.link(u, self.parent(v));
             u = temp;
         }

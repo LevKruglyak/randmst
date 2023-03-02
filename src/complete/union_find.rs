@@ -75,6 +75,7 @@ pub struct SizedUnionFind {
     total_edges: usize,
     total_internal: usize,
 
+    // A queue for aggressive path compression
     queue: Vec<Point>,
 
     // Marginal speedup when storing distribution object
@@ -101,8 +102,8 @@ impl SizedUnionFind {
     /// component. Returns `None` if these two points are in the same component
     pub fn unite(&mut self, mut u: Point, mut v: Point) -> bool {
         // Do aggressive path compression during unite operation
-        self.queue.clear();
-        // let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
+        self.queue.clear(); // Slightly faster than keeping local one
+                            // let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
 
         while self.parent(u) != self.parent(v) {
             // Make sure we're oriented properly to keep root nodes

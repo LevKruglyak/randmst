@@ -1,7 +1,7 @@
 use rand::{Rng, RngCore};
 use rand_distr::Exp1;
 
-use super::union_find::{Point, RemUnionFind};
+use super::union_find::{Point, SizedUnionFind};
 
 pub struct FatComponent {
     pub root: Point,
@@ -23,7 +23,7 @@ pub struct FatComponentSampler<R: RngCore> {
     inv_weight: f64,
     fat_component: Option<FatComponent>,
     total_count: u32,
-    set: RemUnionFind,
+    set: SizedUnionFind,
     rng: R,
 }
 
@@ -32,7 +32,7 @@ impl<R: RngCore> FatComponentSampler<R> {
         Self {
             inv_weight: 1.0,
             rng,
-            set: RemUnionFind::new(size),
+            set: SizedUnionFind::new(size),
             total_count: size - 1,
             fat_component: None,
         }
@@ -45,7 +45,7 @@ impl<R: RngCore> FatComponentSampler<R> {
 
         // When `free_edges` large enough, we can use an approximate distribution
         // to speed up computation
-        if self.set.free_edges() > 65_536 {
+        if self.set.free_edges() > (1 << 16) {
             self.inv_weight -= self.rng.sample::<f64, _>(Exp1) / self.set.free_edges() as f64;
         } else {
             self.inv_weight *=
@@ -62,24 +62,29 @@ impl<R: RngCore> FatComponentSampler<R> {
             self.fat_component = find_fat_component(&mut self.set);
         }
 
-        let edge = match &self.fat_component {
-            Some(component) => sample_component_edge(&mut self.rng, &mut self.set, component),
-            None => sample_sparse_edge(&mut self.rng, &mut self.set),
-        };
+        loop {
+            let edge = match &self.fat_component {
+                Some(component) => sample_component_edge(&mut self.rng, &mut self.set, component),
+                None => sample_sparse_edge(&mut self.rng, &mut self.set),
+            };
 
-        self.set.unite(edge.0, edge.1);
-        self.total_count -= 1;
-        Some(1.0 - self.inv_weight)
+            if !self.set.unite(edge.0, edge.1) {
+                continue;
+            }
+
+            self.total_count -= 1;
+            return Some(1.0 - self.inv_weight);
+        }
     }
 }
 
-fn find_fat_component(set: &mut RemUnionFind) -> Option<FatComponent> {
-    for v in set.points_iter() {
-        if set.size(v) * 2 >= set.points() {
+fn find_fat_component(set: &mut SizedUnionFind) -> Option<FatComponent> {
+    for v in set.iter() {
+        if set.size(v) * 2 >= set.total_size() {
             let root = set.root(v);
 
             let mut fat_component = FatComponent::new(root, set.size(v));
-            for w in set.points_iter() {
+            for w in set.iter() {
                 if set.root(w) != root {
                     fat_component.remainders.push(w);
                 }
@@ -92,12 +97,12 @@ fn find_fat_component(set: &mut RemUnionFind) -> Option<FatComponent> {
     None
 }
 
-fn update_fat_component(set: &mut RemUnionFind, component: &mut FatComponent) {
+fn update_fat_component(set: &mut SizedUnionFind, component: &mut FatComponent) {
     // Update location and size of the fat component
     component.root = set.root(component.root);
     component.size = set.size(component.root);
 
-    if (set.points() - component.size) * 2 < component.remainders.len() as u32 {
+    if (set.total_size() - component.size) * 2 < component.remainders.len() as u32 {
         // Marginally faster than retain (filter rate is too low for retain to be effective)
         component.remainders = component
             .remainders
@@ -112,7 +117,7 @@ fn update_fat_component(set: &mut RemUnionFind, component: &mut FatComponent) {
     }
 }
 
-fn sample_sparse_edge(rng: &mut impl RngCore, set: &mut RemUnionFind) -> (Point, Point) {
+fn sample_sparse_edge(rng: &mut impl RngCore, set: &mut SizedUnionFind) -> (Point, Point) {
     loop {
         // TODO: figure out trait issue
         let u = rng.sample(&*set);
@@ -126,11 +131,11 @@ fn sample_sparse_edge(rng: &mut impl RngCore, set: &mut RemUnionFind) -> (Point,
 #[allow(clippy::needless_return)]
 fn sample_component_edge(
     rng: &mut impl RngCore,
-    set: &mut RemUnionFind,
+    set: &mut SizedUnionFind,
     component: &FatComponent,
 ) -> (Point, Point) {
     let fat_size = component.size;
-    let remainder_size = set.points() - fat_size;
+    let remainder_size = set.total_size() - fat_size;
     let active = set.free_edges();
 
     if rng.gen_bool((fat_size as usize * remainder_size as usize) as f64 / active as f64) {
@@ -151,7 +156,7 @@ fn sample_component_edge(
 
 fn sample_component(
     rng: &mut impl RngCore,
-    set: &mut RemUnionFind,
+    set: &mut SizedUnionFind,
     component: &FatComponent,
 ) -> Point {
     loop {
@@ -164,7 +169,7 @@ fn sample_component(
 
 fn sample_remainder(
     rng: &mut impl RngCore,
-    set: &mut RemUnionFind,
+    set: &mut SizedUnionFind,
     component: &FatComponent,
 ) -> Point {
     loop {

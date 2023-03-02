@@ -1,56 +1,74 @@
+use std::{
+    cell::Cell,
+    ops::{Index, IndexMut},
+};
+
 use rand_distr::{Distribution, Uniform};
+use smallvec::SmallVec;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub struct Point(u32);
 
-impl Point {
-    fn root(id: u32) -> Self {
-        Self(id)
-    }
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+pub struct LinkSizeCompact {
+    data: Cell<u32>,
 }
 
-const SENTINEL: u32 = 1 << 31;
-const SENTINEL_MASK: u32 = !SENTINEL;
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
-pub struct ParentLink(u32);
-
-pub enum ParentLinkContent {
+pub enum LinkSize {
     Parent(Point),
     Size(u32),
 }
 
-impl ParentLink {
-    fn root(_id: u32) -> Self {
-        Self(SENTINEL | 1)
-    }
+impl LinkSizeCompact {
+    const SENTINEL: u32 = 1 << 31;
+    const SENTINEL_MASK: u32 = !Self::SENTINEL;
 
-    fn is_root(&self) -> bool {
-        self.0 & SENTINEL != 0
-    }
-
-    fn link(&mut self, parent: Point) {
-        // assert_eq!(parent.0 & SENTINEL_MASK, parent.0);
-        self.0 = parent.0
-    }
-
-    fn get_content(&self) -> ParentLinkContent {
-        if self.is_root() {
-            ParentLinkContent::Size(self.0 & SENTINEL_MASK)
-        } else {
-            ParentLinkContent::Parent(Point(self.0))
+    fn root(size: u32) -> Self {
+        debug_assert_eq!(size & Self::SENTINEL, 0);
+        Self {
+            data: Cell::new(Self::SENTINEL | size),
         }
     }
 
-    fn inc_size(&mut self, size: u32) {
-        // assert!(self.is_root());
-        self.0 += size;
+    fn link(parent: Point) -> Self {
+        debug_assert_eq!(parent.0 & Self::SENTINEL_MASK, parent.0);
+        Self {
+            data: Cell::new(parent.0),
+        }
+    }
+
+    fn set(&self, u: &Self) {
+        self.data.set(u.data.get())
+    }
+
+    fn is_root(&self) -> bool {
+        self.data.get() & Self::SENTINEL != 0
+    }
+
+    fn expand(&self) -> LinkSize {
+        if self.is_root() {
+            LinkSize::Size(self.data.get() & Self::SENTINEL_MASK)
+        } else {
+            LinkSize::Parent(Point(self.data.get()))
+        }
+    }
+
+    fn try_size(&self) -> Option<u32> {
+        match self.expand() {
+            LinkSize::Size(size) => Some(size),
+            _ => None,
+        }
+    }
+
+    fn add_size(&mut self, size: u32) {
+        debug_assert!(self.is_root());
+        self.data.set(self.data.get() + size);
     }
 }
 
-pub struct RemUnionFind {
+pub struct SizedUnionFind {
     /// Sends each Point (as a usize) to its Parent. (roots are self-parent)
-    parents: Vec<ParentLink>,
+    data: Vec<LinkSizeCompact>,
 
     // Metadata to keep track of sizes for sampling purposes
     size: u32,
@@ -61,10 +79,14 @@ pub struct RemUnionFind {
     vertex_distr: Uniform<u32>,
 }
 
-impl RemUnionFind {
+impl SizedUnionFind {
     pub fn new(size: u32) -> Self {
+        assert_eq!(size & LinkSizeCompact::SENTINEL, 0);
         Self {
-            parents: (0..size).into_iter().map(ParentLink::root).collect(),
+            data: (0..size)
+                .into_iter()
+                .map(|_| LinkSizeCompact::root(1))
+                .collect(),
             size,
             total_edges: (size as usize) * (size as usize - 1) / 2,
             total_internal: 0,
@@ -74,7 +96,10 @@ impl RemUnionFind {
 
     /// Unites the two sets, returns the size and root of the united
     /// component. Returns `None` if these two points are in the same component
-    pub fn unite(&mut self, mut u: Point, mut v: Point) -> Option<(u32, Point)> {
+    pub fn unite(&mut self, mut u: Point, mut v: Point) -> bool {
+        // Do aggressive path compression during unite operation
+        let mut queue: SmallVec<[Point; 4]> = SmallVec::new();
+
         while self.parent(u) != self.parent(v) {
             // Make sure we're oriented properly to keep root nodes
             // at the end of the array
@@ -83,43 +108,80 @@ impl RemUnionFind {
             }
 
             // If we've reached a root, we're done
-            if let Some(join_size) = self.root_size(u) {
+            if let Some(join_size) = self[u].try_size() {
                 self.link(u, self.parent(v));
-                let (size, root) = self.add_size_to_root(v, join_size);
+
+                let (root, size) = self.root_size(v);
+                self[root].set(&LinkSizeCompact::root(size + join_size));
+
+                for p in queue {
+                    self.link(p, root);
+                }
 
                 // Update total internal edges
                 self.total_internal += size as usize * join_size as usize;
 
-                return Some((size, root));
+                return true;
             }
 
             let temp = self.parent(u);
-            self.link(u, self.parent(v));
+            queue.push(u);
+            // self.link(u, self.parent(v));
             u = temp;
         }
 
         // This means that these points were already part of the same component
-        None
+        false
     }
 
     /// Are these two points in the same set?
-    pub fn same_set(&mut self, mut u: Point, mut v: Point) -> bool {
-        // ~ 20% speed improvement compared to:
-        // self.root(u) == self.root(v)
+    pub fn same_set(&self, mut u: Point, mut v: Point) -> bool {
+        // TODO: see if unrolling is faster
+        self.root(u) == self.root(v)
+    }
 
-        let u_orig = u;
-        let v_orig = v;
+    pub fn root(&self, u: Point) -> Point {
+        self.root_size(u).0
+    }
 
-        while !self.is_root(u) | !self.is_root(v) {
-            u = self.parent(u);
-            v = self.parent(v);
+    pub fn size(&self, u: Point) -> u32 {
+        self.root_size(u).1
+    }
+
+    pub fn root_size(&self, mut u: Point) -> (Point, u32) {
+        let mut root = u;
+        if let Some(size) = self[root].try_size() {
+            return (root, size);
         }
 
-        // Path splitting step
-        self.link(u_orig, u);
-        self.link(v_orig, v);
+        let mut prev = &self[root];
 
-        u == v
+        loop {
+            let temp = self.parent(root);
+
+            if let Some(size) = self[temp].try_size() {
+                return (temp, size);
+            }
+
+            // Path splitting
+            prev.set(&self[temp]);
+            prev = &self[temp];
+            root = temp;
+        }
+    }
+
+    fn link(&self, src: Point, dst: Point) {
+        // Important step to avoid infinite sentinel
+        if src != dst {
+            self[src].set(&LinkSizeCompact::link(dst));
+        }
+    }
+
+    fn parent(&self, u: Point) -> Point {
+        match self[u].expand() {
+            LinkSize::Parent(parent) => parent,
+            LinkSize::Size(_) => u,
+        }
     }
 
     /// Returns the number of internal edges among the components
@@ -137,82 +199,32 @@ impl RemUnionFind {
         self.total_edges
     }
 
-    pub fn points(&self) -> u32 {
+    pub fn total_size(&self) -> u32 {
         self.size
     }
 
-    pub fn points_iter(&self) -> RemUnionFindIntoIter {
-        RemUnionFindIntoIter {
-            size: self.points(),
+    pub fn iter(&self) -> SizedUnionFindIntoIter {
+        SizedUnionFindIntoIter {
+            size: self.total_size(),
             index: 0,
         }
     }
+}
 
-    /// Traverse to the root, splitting paths on the way
-    pub fn root(&mut self, u: Point) -> Point {
-        if self.is_root(u) {
-            return u;
-        }
+impl Index<Point> for SizedUnionFind {
+    type Output = LinkSizeCompact;
 
-        let mut root = u;
-
-        while !self.is_root(root) {
-            root = self.parent(root);
-        }
-
-        // connect `u` to its root
-        self.link(u, root);
-
-        root
-    }
-
-    pub fn size(&mut self, u: Point) -> u32 {
-        let root = self.root(u);
-        // TODO: FIX!!!
-        self.root_size(root).unwrap()
-    }
-
-    /// If `u` is a root, will return `Some(size)`, otherwise `None`
-    fn root_size(&self, u: Point) -> Option<u32> {
-        match self.parents[u.0 as usize].get_content() {
-            ParentLinkContent::Size(size) => Some(size),
-            ParentLinkContent::Parent(_) => None,
-        }
-    }
-
-    // Add a size to the given set, return the original size
-    fn add_size_to_root(&mut self, point: Point, size: u32) -> (u32, Point) {
-        let root = self.root(point);
-        let original_size = self.size(root);
-        self.parents[root.0 as usize].inc_size(size);
-        (original_size, root)
-    }
-
-    fn link(&mut self, src: Point, dst: Point) {
-        // To avoid overwriting infinte loop
-        if src != dst {
-            self.parents[src.0 as usize].link(dst);
-        }
-    }
-
-    fn parent(&self, u: Point) -> Point {
-        match self.parents[u.0 as usize].get_content() {
-            ParentLinkContent::Size(_) => u,
-            ParentLinkContent::Parent(parent) => parent,
-        }
-    }
-
-    fn is_root(&self, u: Point) -> bool {
-        self.parents[u.0 as usize].is_root()
+    fn index(&self, index: Point) -> &Self::Output {
+        &self.data[index.0 as usize]
     }
 }
 
-pub struct RemUnionFindIntoIter {
+pub struct SizedUnionFindIntoIter {
     size: u32,
     index: u32,
 }
 
-impl Iterator for RemUnionFindIntoIter {
+impl Iterator for SizedUnionFindIntoIter {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -226,7 +238,7 @@ impl Iterator for RemUnionFindIntoIter {
     }
 }
 
-impl Distribution<Point> for RemUnionFind {
+impl Distribution<Point> for SizedUnionFind {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Point {
         Point(self.vertex_distr.sample(rng))
     }
@@ -234,13 +246,13 @@ impl Distribution<Point> for RemUnionFind {
 
 #[cfg(test)]
 mod tests {
-    use super::{Point, RemUnionFind};
+    use super::{Point, SizedUnionFind};
 
     #[test]
     fn root() {
-        let mut set = RemUnionFind::new(10);
-        assert!(set.is_root(Point(2)));
-        assert!(set.is_root(Point(3)));
+        let mut set = SizedUnionFind::new(10);
+        assert_eq!(set.root(Point(2)), Point(2));
+        assert_eq!(set.root(Point(3)), Point(3));
         assert!(!set.same_set(Point(3), Point(2)));
         set.link(Point(2), Point(3));
         assert_eq!(set.root(Point(2)), Point(3));
@@ -249,7 +261,7 @@ mod tests {
 
     #[test]
     fn unite() {
-        let mut set = RemUnionFind::new(10);
+        let mut set = SizedUnionFind::new(10);
         set.unite(Point(2), Point(3));
         set.unite(Point(3), Point(4));
         assert_eq!(set.root(Point(2)), Point(4));
@@ -259,7 +271,7 @@ mod tests {
 
     #[test]
     fn simple() {
-        let mut set = RemUnionFind::new(10);
+        let mut set = SizedUnionFind::new(10);
 
         assert_eq!(set.same_set(Point(1), Point(2)), false);
         set.unite(Point(1), Point(2));
@@ -278,17 +290,17 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "benchmark"))]
 mod benchmarks {
     extern crate test;
-    use super::RemUnionFind;
+    use super::SizedUnionFind;
     use rand::{thread_rng, Rng};
     use test::{black_box, Bencher};
 
     const NUM_POINTS: u32 = 100_000;
 
-    fn generate(ratio: f64) -> RemUnionFind {
-        let mut set = RemUnionFind::new(NUM_POINTS);
+    fn generate(ratio: f64) -> SizedUnionFind {
+        let mut set = SizedUnionFind::new(NUM_POINTS);
         let mut rng = thread_rng();
 
         // Randomly unite `unite` edges
@@ -299,7 +311,7 @@ mod benchmarks {
         set
     }
 
-    fn sets() -> Vec<RemUnionFind> {
+    fn sets() -> Vec<SizedUnionFind> {
         vec![generate(0.1), generate(0.5), generate(0.8)]
     }
 

@@ -21,7 +21,7 @@ where
     0.0
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "benchmark"))]
 mod tests {
     use rand::{thread_rng, Rng};
     use test::{black_box, Bencher};

@@ -1,4 +1,4 @@
-#![feature(test, portable_simd)]
+#![cfg_attr(feature = "benchmark", feature(test))]
 #![allow(unused, dead_code)]
 use std::time::{Duration, Instant};
 
@@ -10,7 +10,7 @@ use rand::{thread_rng, RngCore};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 pub mod complete;
-// pub mod euclidean;
+pub mod euclidean;
 
 #[derive(Parser, Debug)]
 #[command(name = "randmst")]

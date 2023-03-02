@@ -71,7 +71,7 @@ hypercube_impl!(2);
 hypercube_impl!(3);
 hypercube_impl!(4);
 
-#[cfg(test)]
+#[cfg(all(test, feature = "benchmark"))]
 mod tests {
     use rand::{thread_rng, Rng};
     use test::{black_box, Bencher};

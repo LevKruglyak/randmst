@@ -4,10 +4,11 @@ use rand_distr::Distribution;
 use self::{
     morton::Morton,
     point::{Hypercube, Point},
-    spatial::SpatialVec,
+    spatial::{recurse_test, SpatialVec},
 };
 
 mod aabb;
+mod kruskal;
 mod merge;
 mod morton;
 mod point;
@@ -18,7 +19,9 @@ where
     Hypercube<D>: Distribution<Point<D>>,
     Point<D>: Morton,
 {
-    let spatial = SpatialVec::new((0..size).map(|_| rng.sample(Hypercube::<D>)));
+    let mut spatial = SpatialVec::new((0..size).map(|_| rng.sample(Hypercube::<D>)));
+
+    recurse_test(spatial.as_slice());
 
     0.0
 }

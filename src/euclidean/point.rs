@@ -1,29 +1,62 @@
-use std::ops::{Add, Mul, Sub};
+use std::{
+    fmt::Display,
+    ops::{Add, Mul, Sub},
+};
 
 use super::morton::{morton_encode_2, morton_encode_3, morton_encode_4, Morton};
 use rand_distr::Distribution;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Point<const D: usize>([u64; D]);
 
+impl<const D: usize> Display for Point<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self.0.map(|x| fixed_to_float(x))))?;
+
+        Ok(())
+    }
+}
+
+impl<const D: usize> Default for Point<D> {
+    fn default() -> Self {
+        Self::from([0; D])
+    }
+}
+
 impl<const D: usize> Point<D> {
+    pub fn from(coords: [u64; D]) -> Self {
+        Self(coords)
+    }
+
+    pub fn coords(&self) -> [u64; D] {
+        self.0
+    }
+
     pub fn distance2_fixed(&self, point: &Point<D>) -> u64 {
         let mut sum = 0_u128;
 
         for i in 0..D {
-            let delt = self.0[i].wrapping_sub(point.0[i]) as u128;
+            let delt = (self.0[i] as u128).wrapping_sub(point.0[i] as u128);
             sum = sum.wrapping_add(delt.wrapping_mul(delt));
         }
 
-        (sum >> MANTISSA_BITS) as u64
+        sum.wrapping_shr(MANTISSA_BITS) as u64
     }
 
-    fn round_to_u32(&self) -> [u32; D] {
-        self.0.map(|x| (x >> (MANTISSA_BITS - u32::BITS)) as u32)
+    pub fn magnitude2_fixed(&self) -> u64 {
+        let mut sum = 0_u128;
+
+        for i in 0..D {
+            let delt = (self.0[i] as u128);
+            sum = sum.wrapping_add(delt.wrapping_mul(delt));
+        }
+
+        sum.wrapping_shr(MANTISSA_BITS) as u64
     }
 
     fn round_to(&self, bits: u32) -> [u32; D] {
-        self.0.map(|x| (x >> (MANTISSA_BITS - bits)) as u32)
+        self.0
+            .map(|x| (x.wrapping_shr(MANTISSA_BITS - bits)) as u32)
     }
 
     pub fn min(&self, rhs: Self) -> Self {
@@ -67,9 +100,9 @@ impl<const D: usize> Sub for Point<D> {
     }
 }
 
-const MANTISSA_BITS: u32 = 52;
-const FIXED_UNIT: u64 = 0x0100_0000_0000_0000;
-const FIXED_MASK: u64 = 0x00FF_FFFF_FFFF_FFFF;
+const MANTISSA_BITS: u32 = 51;
+const FIXED_UNIT: u64 = 0x0008_0000_0000_0000;
+const FIXED_MASK: u64 = 0x0007_FFFF_FFFF_FFFF;
 
 pub fn fixed_to_float(x: u64) -> f64 {
     x as f64 / (FIXED_UNIT as f64)
@@ -106,12 +139,6 @@ impl Morton for Point<3> {
 impl Morton for Point<4> {
     fn morton_encode(&self, resolution: u32) -> usize {
         morton_encode_4(self.round_to(resolution))
-    }
-}
-
-impl<const D: usize> Default for Point<D> {
-    fn default() -> Self {
-        Self([0; D])
     }
 }
 

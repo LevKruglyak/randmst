@@ -110,26 +110,39 @@ impl<const D: usize> MergedSlice<D> {
         }
 
         // First pass
-        let first = kruskal(&mut edges, root.points.len());
+        let first = kruskal(&mut edges, root.points.len(), |_| true);
 
         // Add boundary points
+        let boundary = root.points.len() as u32;
         for (i, &point) in root.points.iter().enumerate() {
             edges.push(Dist2Edge {
                 u: i as u32,
-                v: root.points.len() as u32, // represents the boundary `node`
+                v: boundary, // represents the boundary `node`
                 dist2: root.bounds.dist2(zord[point as usize].0),
             })
         }
 
         // slightly larger union find set to account for the boundary `node`
-        let second = kruskal(&mut edges, root.points.len() + 1);
+        let second = kruskal(&mut edges, root.points.len() + 1, |edge| {
+            (edge.u != boundary) & (edge.v != boundary)
+        });
 
         // Merge the results of the Kruskal's
+        let partial_graph: Vec<MaybeEdge> = first
+            .into_iter()
+            .map(|x| {
+                if let Ok(_) = second.binary_search_by(|y| y.dist2.cmp(&x.dist2)) {
+                    MaybeEdge::Sure(x)
+                } else {
+                    MaybeEdge::Maybe(x)
+                }
+            })
+            .collect();
 
         Self {
             bounds: root.bounds.clone(),
             // TODO: remember to map the points back into the correct representation!!!
-            partial_graph: edges.into_iter().map(|x| MaybeEdge::Sure(x)).collect(),
+            partial_graph,
         }
     }
 }
@@ -206,6 +219,7 @@ where
 {
     let merge = MergedSlice::recursive_merge(slice);
     println!("world bound: {}", merge.bounds);
+    println!("partial_graph: {}", merge.partial_graph.len());
 
     true
     // match slice.split() {

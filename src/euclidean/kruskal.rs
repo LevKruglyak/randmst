@@ -71,12 +71,17 @@ pub struct Dist2Edge {
 }
 
 // TODO: compactify, pack bit into dist field
+#[derive(Debug)]
 pub enum MaybeEdge {
     Sure(Dist2Edge),
     Maybe(Dist2Edge),
 }
 
-pub fn kruskal(edges: &mut Vec<Dist2Edge>, size: usize) -> Vec<Dist2Edge> {
+pub fn kruskal(
+    edges: &mut Vec<Dist2Edge>,
+    size: usize,
+    filter: impl Fn(&Dist2Edge) -> bool,
+) -> Vec<Dist2Edge> {
     if size == 0 {
         return vec![];
     }
@@ -94,7 +99,9 @@ pub fn kruskal(edges: &mut Vec<Dist2Edge>, size: usize) -> Vec<Dist2Edge> {
         }
 
         if union.unite(Point(edge.u), Point(edge.v)) {
-            mst.push(edge);
+            if filter(&edge) {
+                mst.push(edge);
+            }
             counter -= 1;
         }
     }
